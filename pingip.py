@@ -9,7 +9,6 @@ from multiprocessing.pool import ThreadPool
 import logging
 import time
 import re
-import msvcrt
 from tqdm import tqdm
 
 # 设置日志
@@ -33,18 +32,19 @@ def get_all_ips(hosts_list_path):
             ips.append(host.strip())
     return ips
 
+
 #多线程调用ping
 def ping_host(ip):
     global finish
-    popen = subprocess.Popen('ping -w 1 %s' %ip, stdout=subprocess.PIPE,shell=True)
+    popen = subprocess.Popen('ping -c 1 -w 1 %s' %ip, stdout=subprocess.PIPE,shell=True)
     popen.wait()
-    res = popen.stdout.read().decode('gbk').strip('\n')
-    if "平均" in res:
+    res = popen.stdout.read().decode('utf-8').strip('\n')
+    if "1 received" in res:
         try:
-            latency = re.findall("平均 = \d+ms", res)[0]
-            latency = re.findall(r"\d+", latency)[0]
-            loss = re.findall("\d+% 丢失", res)[0]
-            loss = re.findall(r"\d+", loss)[0]
+            latency = re.search(r'rtt min/avg/max/mdev = [\d.]+/([\d.]+)/[\d.]+/[\d.]+ ms', res)
+            latency = float(latency.group(1)) if latency else None
+            loss = re.search(r'(\d+)% packet loss', res)
+            loss = int(loss.group(1)) if loss else None
             if int(latency)<THRESHOLD:
                 #logging.info("{}, 延迟:{}ms, 丢包:{}%".format(ip, latency, loss))
                 outcomes.append((ip, int(latency), int(loss)))
@@ -52,27 +52,20 @@ def ping_host(ip):
             print(e) 
     finish += 1  
 
-# 判断是否为管理员
-def is_admin():
-    try:
-        return ctypes.windll.shell32.IsUserAnAdmin()
-    except:
-        return False
+
 
 
 if __name__ == '__main__':
-    if is_admin() == False:
-        print("请以管理员权限运行")
-        os.system("pause")
-        sys.exit()
     # 线程数：为200时候，我本地测试179秒。
     # 不同配置和网络的电脑结果有差异。线程不是越大越好，设置成不超过300。
     # 超过300后丢包测试的结果不准。
-    WORD_THREAD_NUM = int(input("线程数(一般设置为200)范围为0-2000："))
+    # WORD_THREAD_NUM = int(input("线程数(一般设置为200)范围为0-2000："))
+    WORD_THREAD_NUM = 200
     assert 0<WORD_THREAD_NUM<2000
     # 移动连接香港，一般设置100ms，电信联通连接美西，一般设置200
-    THRESHOLD = int(input("阈值(移动设置为100，电信联通设置200)范围为0-300:"))
-    assert 0<THRESHOLD<300
+    # THRESHOLD = int(input("阈值(移动设置为100，电信联通设置200)范围为0-400:"))
+    THRESHOLD = 300
+    # assert 0<THRESHOLD<=400
     now = time.time()
     # 初始化参数
     set_logging_format()
@@ -92,7 +85,7 @@ if __name__ == '__main__':
             time.sleep(1.0)
             pbar.update(finish-finish_temp)  
             finish_temp = finish
-            if (total<=finish or msvcrt.kbhit()):
+            if (total<=finish):
                 outcomes.sort(key=lambda outcome_item: (outcome_item[2], outcome_item[1]))
                 if len(outcomes)==0:
                     logging.info("没有找到合适的IP，请调整阈值")
@@ -104,4 +97,3 @@ if __name__ == '__main__':
                 print("正在退出")
                 break
     print("总共耗时：",time.time()-now, 's')
-    os.system("pause")
