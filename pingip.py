@@ -7,9 +7,10 @@ import ctypes
 import  subprocess
 from multiprocessing.pool import ThreadPool
 import logging
-import time
+import time, random 
 import re
 from tqdm import tqdm
+from math import *
 
 # 设置日志
 def set_logging_format():
@@ -64,14 +65,17 @@ if __name__ == '__main__':
     assert 0<WORD_THREAD_NUM<2000
     # 移动连接香港，一般设置100ms，电信联通连接美西，一般设置200
     # THRESHOLD = int(input("阈值(移动设置为100，电信联通设置200)范围为0-400:"))
-    THRESHOLD = 300
+    THRESHOLD = inf
     # assert 0<THRESHOLD<=400
     now = time.time()
     # 初始化参数
     set_logging_format()
-    hosts_list_path  = "./input.txt"
+    hosts_list_path  = "./input.txt"    
+    # hosts_list_path  = "./iprange.txt"
     ips = get_all_ips(hosts_list_path)
+    ips = random.sample(ips,min(30,len(ips)))
     total = len(ips)
+    print(ips)
     finish = 1
     finish_temp = 1
     outcomes = []
